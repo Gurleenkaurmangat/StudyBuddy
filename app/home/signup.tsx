@@ -1,14 +1,22 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// app/home/signup.tsx
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { addUser, findUserByEmail, setCurrentUserEmail, StoredUser } from '../utils/storage';
+
+const BG = '#fde2f3';
+const PURPLE = '#652ea5';
+const PURPLE_DARK = '#5a1040';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -18,133 +26,206 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSignUp = async () => {
-    if (name && mobile && email && pass && confirm) {
-      if (pass !== confirm) {
-        Alert.alert('⚠️ Passwords do not match');
-        return;
-      }
+    const n = name.trim(),
+      m = mobile.trim(),
+      e = email.trim().toLowerCase(),
+      p = pass,
+      c = confirm;
 
-      try {
-        await AsyncStorage.setItem('userName', name);
-        router.replace('/home/page');
-      } catch (error) {
-        console.error('Error saving name:', error);
-        Alert.alert('❌ Failed to save user data');
-      }
-    } else {
+    if (!n || !m || !e || !p || !c) {
       Alert.alert('⚠️ Please fill in all fields');
+      return;
+    }
+    if (p !== c) {
+      Alert.alert('⚠️ Passwords do not match');
+      return;
+    }
+
+    const existing = await findUserByEmail(e);
+    if (existing) {
+      Alert.alert('⚠️ Email already registered', 'Try signing in instead.');
+      return;
+    }
+
+    const newUser: StoredUser = { name: n, mobile: m, email: e, password: p };
+    try {
+      await addUser(newUser);
+      await setCurrentUserEmail(e);
+      router.replace('/home/page');
+    } catch (err) {
+      console.error('Signup error:', err);
+      Alert.alert('❌ Failed to create account');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        {/* Top Row: Back and Title */}
-        <View style={styles.topRow}>
-          <TouchableOpacity onPress={() => router.push('/home/signin')}>
-  <         Text style={styles.backText}>←</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>Sign Up</Text>
-          <View style={{ width: 60 }} /> {/* spacer to balance layout */}
-        </View>
-
-        {/* Input Fields */}
-        <TextInput
-          style={styles.input}
-          placeholder="Name"
-          placeholderTextColor="#aaa"
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Mobile Number"
-          placeholderTextColor="#aaa"
-          value={mobile}
-          onChangeText={setMobile}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email address"
-          placeholderTextColor="#aaa"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#aaa"
-          value={pass}
-          onChangeText={setPass}
-          secureTextEntry
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor="#aaa"
-          value={confirm}
-          onChangeText={setConfirm}
-          secureTextEntry
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-          <Text style={styles.buttonText}>SIGN UP</Text>
-        </TouchableOpacity>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.screen}
+    >
+      {/* Logo */}
+      <View style={styles.logoContainer}>
+        <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
       </View>
-    </View>
+
+      <View style={styles.cardShadow}>
+        <View style={styles.card}>
+          <View style={styles.topRow}>
+            <TouchableOpacity onPress={() => router.replace('/home/signin')}>
+              <Text style={styles.backText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Sign Up</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <Text style={styles.label}>Name</Text>
+          <TextInput
+            style={styles.inputUnderline}
+            placeholder=""
+            placeholderTextColor="#aaa"
+            value={name}
+            onChangeText={setName}
+          />
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Mobile Number</Text>
+          <TextInput
+            style={styles.inputUnderline}
+            placeholder=""
+            placeholderTextColor="#aaa"
+            value={mobile}
+            onChangeText={setMobile}
+            keyboardType="phone-pad"
+          />
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Email address</Text>
+          <TextInput
+            style={styles.inputUnderline}
+            placeholder=""
+            placeholderTextColor="#aaa"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
+          <View style={styles.row}>
+            <TextInput
+              style={[styles.inputUnderline, { flex: 1, marginBottom: 0 }]}
+              placeholder=""
+              placeholderTextColor="#aaa"
+              value={pass}
+              onChangeText={setPass}
+              secureTextEntry={!showPass}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              onPress={() => setShowPass((s) => !s)}
+              style={styles.eyeBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={{ fontSize: 16 }}>{showPass ? '🙈' : '👁'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Confirm Password</Text>
+          <View style={styles.row}>
+            <TextInput
+              style={[styles.inputUnderline, { flex: 1, marginBottom: 0 }]}
+              placeholder=""
+              placeholderTextColor="#aaa"
+              value={confirm}
+              onChangeText={setConfirm}
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              onPress={() => setShowConfirm((s) => !s)}
+              style={styles.eyeBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={{ fontSize: 16 }}>{showConfirm ? '🙈' : '👁'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignUp}>
+            <Text style={styles.primaryText}>SIGN UP</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#fde2f3',
-    paddingHorizontal: 20,
-    paddingTop: 60,
+    backgroundColor: BG,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: PURPLE,
+    backgroundColor: '#fff',
+  },
+  cardShadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    elevation: 5,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: PURPLE,
+    padding: 18,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
-  backText: {
-    color: '#652ea5',
-    fontSize: 16,
-    fontWeight: '500',
-  },
+  backText: { color: PURPLE, fontSize: 20, fontWeight: '600' },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#652ea5',
+    fontSize: 16,
+    fontWeight: '700',
+    color: PURPLE_DARK,
     textAlign: 'center',
   },
-  input: {
-    borderBottomWidth: 1,
-    borderColor: '#aaa',
-    paddingVertical: 10,
-    marginBottom: 20,
-    fontSize: 16,
+  label: { fontSize: 12, color: PURPLE_DARK, marginBottom: 6 },
+  inputUnderline: {
+    borderBottomWidth: 2,
+    borderBottomColor: PURPLE_DARK,
+    paddingVertical: 6,
+    marginBottom: 6,
+    color: '#111',
   },
-  button: {
-    backgroundColor: '#652ea5',
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20, // space before next element / button
+  },
+  eyeBtn: { marginLeft: 10, paddingBottom: 6, paddingTop: 6 },
+  primaryBtn: {
+    backgroundColor: PURPLE,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 24,
+    alignItems: 'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-    textAlign: 'center',
-  },
+  primaryText: { color: '#fff', fontWeight: '800', letterSpacing: 0.5 },
 });

@@ -1,32 +1,63 @@
 // app/utils/storage.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TASKS_KEY = 'tasks';
+export type StoredUser = {
+  name: string;
+  mobile: string;
+  email: string;
+  password: string;
 
-export async function getTasks() {
+  // NEW optional profile fields
+  program?: string;
+  yearSemester?: string;
+  goals?: string;
+  bio?: string;
+  favoriteSubject?: string;
+  dailyHours?: string;     // store as string for simple input (e.g., "3")
+  avatarUrl?: string;
+};
+
+const USERS_KEY = 'users:v1';               // array of user objects
+const CURRENT_KEY = 'currentUserEmail:v1';  // last/active user's email
+
+export async function getUsers(): Promise<StoredUser[]> {
   try {
-    const storedTasks = await AsyncStorage.getItem(TASKS_KEY);
-    return storedTasks ? JSON.parse(storedTasks) : [];
-  } catch (error) {
-    console.error('Failed to fetch tasks:', error);
+    const raw = await AsyncStorage.getItem(USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
     return [];
   }
 }
 
-export async function saveTask(newTask: { task: string; dueDate: string }) {
-  try {
-    const existing = await getTasks();
-    const updated = [...existing, newTask];
-    await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updated));
-  } catch (error) {
-    console.error('Failed to save task:', error);
-  }
+export async function saveUsers(users: StoredUser[]) {
+  await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-export async function clearTasks() {
-  try {
-    await AsyncStorage.removeItem(TASKS_KEY);
-  } catch (error) {
-    console.error('Failed to clear tasks:', error);
-  }
+export async function findUserByEmail(email: string) {
+  const users = await getUsers();
+  return users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+export async function addUser(user: StoredUser) {
+  const users = await getUsers();
+  users.push(user);
+  await saveUsers(users);
+}
+
+export async function setCurrentUserEmail(email: string) {
+  await AsyncStorage.setItem(CURRENT_KEY, email);
+}
+
+export async function getCurrentUserEmail(): Promise<string | null> {
+  return AsyncStorage.getItem(CURRENT_KEY);
+}
+
+export async function getCurrentUser(): Promise<StoredUser | null> {
+  const email = await getCurrentUserEmail();
+  if (!email) return null;
+  return findUserByEmail(email);
+}
+
+export async function signOut() {
+  await AsyncStorage.removeItem(CURRENT_KEY);
 }
